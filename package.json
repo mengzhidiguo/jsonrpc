@@ -1,5 +1,5 @@
 {
-  "name": "jsonrpc",
+  "name": "@mengzhidiguo/jsonrpc",
   "version": "0.0.1",
   "description": "jsonrpc2.0 解析库",
   "main": "dist/index.js",
@@ -10,6 +10,11 @@
     "prebuild": "shx rm -rf dist",
     "build": "tsc"
   },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:mengzhidiguo/jsonrpc.git"
+  },
+  "homepage": "https://github.com/mengzhidiguo/jsonrpc",
   "keywords": [
     "jsonrpc2.0",
     "js"
