@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "noImplicitAny": false,
+    "removeComments": true,
+    "preserveConstEnums": true,
+    "declaration": true,
+    "outDir": "dist",
+    "sourceMap": false,
+    "lib": ["ESNext", "ESNext.Promise", "dom"]
+  },
+  "exclude": ["node_modules", "**/*.spec.ts"]
+}
