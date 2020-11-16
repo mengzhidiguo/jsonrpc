@@ -1,24 +1,4 @@
-# jsonrpc
-
-> JSON-RPC 2.0 解析及调用库, 基于 [JSON-RPC 2.0](https://www.jsonrpc.org/specification) 编写
-
-## 功能
-
-- 服务端解析
-- 客户端调用
-- 调用方基于 `Promise`
-- node & browser
-- 灵活、方便使用
-
-## 使用方式
-
-``` plain
-npm install --save @mengzhidiguo/jsonrpc
-```
-
-### 示例程序
-
-``` typescript
+import { JsonRpc2 } from "../index";
 
 /**
  * 本地注册函数，接受调用
@@ -213,6 +193,3 @@ testResponse()
 testRequest()
   .then(() => console.log("end"))
   .catch((err) => console.log("err", err));
-
-
-```

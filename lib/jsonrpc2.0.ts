@@ -8,7 +8,7 @@ export const ERROR_CODEs = {
   InternalError: { code: -32603, msg: "内部错误" },
   Timeout: { code: -32000, msg: "超时，没有收到可辨认的回复" },
 };
-type unknownFunction = (args: unknown) => unknown;
+type unknownFunction = (args: any) => any;
 export class JsonRpc2 {
   private version = "2.0";
   private registerRpcCallMap = new Map();
@@ -30,47 +30,80 @@ export class JsonRpc2 {
   ) {
     this.registerRpcCallMap.set(methodName, { method, paramsKeys });
   }
+
+  registerRpcNotifyCall(
+    methodName: string,
+    method: unknownFunction,
+    paramsKeys: string[]
+  ) {
+    this.registerRpcCallMap.set(methodName, {
+      method,
+      paramsKeys,
+      type: "notify",
+    });
+  }
   unregisterRpcCall(methodName: string) {
     this.registerRpcCallMap.delete(methodName);
   }
-  receive(data: string | Record<string, unknown>) {
-    let id;
+  async receive(data: string | Record<string, unknown>) {
+    let receiveData;
     try {
-      const result = typeof data === "string" ? JSON.parse(data) : data;
-      id = result.id;
-      if (Array.isArray(result)) {
-        result.forEach((r) => this.handleResponse(r));
-      } else {
-        this.handleResponse(result);
-      }
+      receiveData = typeof data === "string" ? JSON.parse(data) : data;
     } catch (error) {
-      console.warn("不理解的消息", error);
+      console.log("不理解的消息:", error.message);
+      return this.send({
+        jsonrpc: this.version,
+        error: ERROR_CODEs.ParseError,
+        id: null,
+      });
+    }
+    const id = receiveData.id;
+
+    // 当为 `回应` 时
+    if (
+      receiveData.jsonrpc === this.version &&
+      (receiveData.result || receiveData.error) &&
+      id != null &&
+      id !== undefined &&
+      this.waitForResult.has(id)
+    ) {
+      return this.handleResponse(receiveData);
+    }
+
+    // 当为 `请求` 时
+
+    let content = Array.isArray(receiveData)
+      ? await Promise.all(receiveData.map((r) => this.handleRequest(r)))
+      : await this.handleRequest(receiveData);
+    content = Array.isArray(receiveData)
+      ? content.filter((item) => !!item)
+      : content;
+    if (Array.isArray(receiveData) && receiveData.length === 0) {
       this.send({
         jsonrpc: this.version,
         error: ERROR_CODEs.InvalidRequest,
         id,
       });
+    } else if (Array.isArray(content) && content.length === 0) {
+      return;
+    } else if (!!content) {
+      this.send(content);
     }
   }
-  private async handleResponse(res: any) {
-    if (res.jsonrpc !== this.version) {
-      throw new Error(`jsonrpc: ${res.jsonrpc}`);
-    }
-    // 处理 rpc 返回有效值
-    if (
-      (res.result || res.error) &&
-      res.id != null &&
-      res.id !== undefined &&
-      this.waitForResult.has(res.id)
-    ) {
-      const { successCall, failCall } = this.waitForResult.get(res.id);
-      this.waitForResult.delete(res.id);
-      return res.result ? successCall(res.result) : failCall(res.error);
+  private async handleRequest(res: any) {
+    if (res.jsonrpc !== this.version || typeof res !== "object") {
+      return {
+        jsonrpc: this.version,
+        error: ERROR_CODEs.InvalidRequest,
+        id: res.id,
+      };
     }
 
     // 处理 rpc 有效调用
     if (res.method && this.registerRpcCallMap.has(res.method)) {
-      const { method, paramsKeys } = this.registerRpcCallMap.get(res.method);
+      const { method, paramsKeys, type } = this.registerRpcCallMap.get(
+        res.method
+      );
       let content;
       try {
         const result = await (Array.isArray(res.params)
@@ -88,17 +121,29 @@ export class JsonRpc2 {
           id: res.id,
         };
       }
-      return this.send(content);
+
+      return type ? undefined : content;
     }
+
     // 处理 rpc 无效调用
     if (res.method && !this.registerRpcCallMap.has(res.method)) {
-      return this.send({
+      return {
         jsonrpc: this.version,
         error: ERROR_CODEs.MethodNotFound,
         id: res.id,
-      });
+      };
     }
-    throw new Error("未处理的消息");
+    return {
+      jsonrpc: this.version,
+      error: ERROR_CODEs.InvalidRequest,
+      id: res.id,
+    };
+  }
+  private handleResponse(res: any) {
+    const { id, result, error } = res;
+    const { successCall, failCall } = this.waitForResult.get(id);
+    this.waitForResult.delete(id);
+    return result ? successCall(result) : failCall(error);
   }
 
   /**
@@ -118,12 +163,12 @@ export class JsonRpc2 {
             jsonrpc: this.version,
             error: ERROR_CODEs.Timeout,
             id: key,
-          }).catch(() => {});
+          });
         }
       });
     }, this.timeout);
   }
-  async call(method: string, ...params: any[]) {
+  async call(method: string, params?: any) {
     const id = v4();
     const content = {
       jsonrpc: this.version,
@@ -142,11 +187,9 @@ export class JsonRpc2 {
     this.timeoutHandle();
     return result;
   }
-  async bulkCall(...args: any[]) {
-    const results = args.map(([method, ...params]) =>
-      this.call(method, ...params)
-    );
-    return Promise.all(results);
+  async bulkCall(...args: { method: string; params: any }[]) {
+    const results = args.map(({ method, params }) => this.call(method, params));
+    return Promise.allSettled(results);
   }
   notify(method: string, params: any) {
     const content = {
