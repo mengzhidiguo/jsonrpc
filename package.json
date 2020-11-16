@@ -1,6 +1,6 @@
 {
   "name": "@mengzhidiguo/jsonrpc",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "jsonrpc2.0 解析库",
   "main": "dist/index.js",
   "browser": {
@@ -14,7 +14,7 @@
     "type": "git",
     "url": "git@github.com:mengzhidiguo/jsonrpc.git"
   },
-  "homepage": "https://github.com/mengzhidiguo/jsonrpc",
+  "homepage": "https://github.com/mengzhidiguo/jsonrpc#readme",
   "keywords": [
     "jsonrpc2.0",
     "js"
