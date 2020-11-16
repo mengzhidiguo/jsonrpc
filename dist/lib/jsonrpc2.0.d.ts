@@ -24,7 +24,7 @@ export declare const ERROR_CODEs: {
         msg: string;
     };
 };
-declare type unknownFunction = (args: unknown) => unknown;
+declare type unknownFunction = (args: any) => any;
 export declare class JsonRpc2 {
     private version;
     private registerRpcCallMap;
@@ -37,12 +37,17 @@ export declare class JsonRpc2 {
         timeout: number;
     });
     registerRpcCall(methodName: string, method: unknownFunction, paramsKeys: string[]): void;
+    registerRpcNotifyCall(methodName: string, method: unknownFunction, paramsKeys: string[]): void;
     unregisterRpcCall(methodName: string): void;
-    receive(data: string | Record<string, unknown>): void;
+    receive(data: string | Record<string, unknown>): Promise<any>;
+    private handleRequest;
     private handleResponse;
     private timeoutHandle;
-    call(method: string, ...params: any[]): Promise<unknown>;
-    bulkCall(...args: any[]): Promise<unknown[]>;
+    call(method: string, params?: any): Promise<unknown>;
+    bulkCall(...args: {
+        method: string;
+        params: any;
+    }[]): Promise<PromiseSettledResult<unknown>[]>;
     notify(method: string, params: any): void;
 }
 export {};

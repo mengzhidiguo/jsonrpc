@@ -35,13 +35,6 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
-var __spreadArrays = (this && this.__spreadArrays) || function () {
-    for (var s = 0, i = 0, il = arguments.length; i < il; i++) s += arguments[i].length;
-    for (var r = Array(s), k = 0, i = 0; i < il; i++)
-        for (var a = arguments[i], j = 0, jl = a.length; j < jl; j++, k++)
-            r[k] = a[j];
-    return r;
-};
 exports.__esModule = true;
 exports.JsonRpc2 = exports.ERROR_CODEs = void 0;
 var uuid_1 = require("uuid");
@@ -67,58 +60,97 @@ var JsonRpc2 = (function () {
     JsonRpc2.prototype.registerRpcCall = function (methodName, method, paramsKeys) {
         this.registerRpcCallMap.set(methodName, { method: method, paramsKeys: paramsKeys });
     };
+    JsonRpc2.prototype.registerRpcNotifyCall = function (methodName, method, paramsKeys) {
+        this.registerRpcCallMap.set(methodName, {
+            method: method,
+            paramsKeys: paramsKeys,
+            type: "notify"
+        });
+    };
     JsonRpc2.prototype.unregisterRpcCall = function (methodName) {
         this.registerRpcCallMap["delete"](methodName);
     };
     JsonRpc2.prototype.receive = function (data) {
-        var _this = this;
-        var id;
-        try {
-            var result = typeof data === "string" ? JSON.parse(data) : data;
-            id = result.id;
-            if (Array.isArray(result)) {
-                result.forEach(function (r) { return _this.handleResponse(r); });
-            }
-            else {
-                this.handleResponse(result);
-            }
-        }
-        catch (error) {
-            console.warn("不理解的消息", error);
-            this.send({
-                jsonrpc: this.version,
-                error: exports.ERROR_CODEs.InvalidRequest,
-                id: id
-            });
-        }
-    };
-    JsonRpc2.prototype.handleResponse = function (res) {
         return __awaiter(this, void 0, void 0, function () {
-            var _a, successCall, failCall, _b, method, paramsKeys, content, result, error_1;
-            return __generator(this, function (_c) {
-                switch (_c.label) {
+            var receiveData, id, content, _a;
+            var _this = this;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
                     case 0:
-                        if (res.jsonrpc !== this.version) {
-                            throw new Error("jsonrpc: " + res.jsonrpc);
+                        try {
+                            receiveData = typeof data === "string" ? JSON.parse(data) : data;
                         }
-                        if ((res.result || res.error) &&
-                            res.id != null &&
-                            res.id !== undefined &&
-                            this.waitForResult.has(res.id)) {
-                            _a = this.waitForResult.get(res.id), successCall = _a.successCall, failCall = _a.failCall;
-                            this.waitForResult["delete"](res.id);
-                            return [2, res.result ? successCall(res.result) : failCall(res.error)];
+                        catch (error) {
+                            console.log("不理解的消息:", error.message);
+                            return [2, this.send({
+                                    jsonrpc: this.version,
+                                    error: exports.ERROR_CODEs.ParseError,
+                                    id: null
+                                })];
+                        }
+                        id = receiveData.id;
+                        if (receiveData.jsonrpc === this.version &&
+                            (receiveData.result || receiveData.error) &&
+                            id != null &&
+                            id !== undefined &&
+                            this.waitForResult.has(id)) {
+                            return [2, this.handleResponse(receiveData)];
+                        }
+                        if (!Array.isArray(receiveData)) return [3, 2];
+                        return [4, Promise.all(receiveData.map(function (r) { return _this.handleRequest(r); }))];
+                    case 1:
+                        _a = _b.sent();
+                        return [3, 4];
+                    case 2: return [4, this.handleRequest(receiveData)];
+                    case 3:
+                        _a = _b.sent();
+                        _b.label = 4;
+                    case 4:
+                        content = _a;
+                        content = Array.isArray(receiveData)
+                            ? content.filter(function (item) { return !!item; })
+                            : content;
+                        if (Array.isArray(receiveData) && receiveData.length === 0) {
+                            this.send({
+                                jsonrpc: this.version,
+                                error: exports.ERROR_CODEs.InvalidRequest,
+                                id: id
+                            });
+                        }
+                        else if (Array.isArray(content) && content.length === 0) {
+                            return [2];
+                        }
+                        else if (!!content) {
+                            this.send(content);
+                        }
+                        return [2];
+                }
+            });
+        });
+    };
+    JsonRpc2.prototype.handleRequest = function (res) {
+        return __awaiter(this, void 0, void 0, function () {
+            var _a, method, paramsKeys, type, content, result, error_1;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        if (res.jsonrpc !== this.version || typeof res !== "object") {
+                            return [2, {
+                                    jsonrpc: this.version,
+                                    error: exports.ERROR_CODEs.InvalidRequest,
+                                    id: res.id
+                                }];
                         }
                         if (!(res.method && this.registerRpcCallMap.has(res.method))) return [3, 5];
-                        _b = this.registerRpcCallMap.get(res.method), method = _b.method, paramsKeys = _b.paramsKeys;
+                        _a = this.registerRpcCallMap.get(res.method), method = _a.method, paramsKeys = _a.paramsKeys, type = _a.type;
                         content = void 0;
-                        _c.label = 1;
+                        _b.label = 1;
                     case 1:
-                        _c.trys.push([1, 3, , 4]);
+                        _b.trys.push([1, 3, , 4]);
                         return [4, (Array.isArray(res.params)
                                 ? method.apply(void 0, res.params) : method.apply(void 0, paramsKeys.map(function (key) { return res.params[key]; })))];
                     case 2:
-                        result = _c.sent();
+                        result = _b.sent();
                         content = {
                             jsonrpc: this.version,
                             result: result,
@@ -126,26 +158,36 @@ var JsonRpc2 = (function () {
                         };
                         return [3, 4];
                     case 3:
-                        error_1 = _c.sent();
+                        error_1 = _b.sent();
                         content = {
                             jsonrpc: this.version,
                             error: exports.ERROR_CODEs.InternalError,
                             id: res.id
                         };
                         return [3, 4];
-                    case 4: return [2, this.send(content)];
+                    case 4: return [2, type ? undefined : content];
                     case 5:
                         if (res.method && !this.registerRpcCallMap.has(res.method)) {
-                            return [2, this.send({
+                            return [2, {
                                     jsonrpc: this.version,
                                     error: exports.ERROR_CODEs.MethodNotFound,
                                     id: res.id
-                                })];
+                                }];
                         }
-                        throw new Error("未处理的消息");
+                        return [2, {
+                                jsonrpc: this.version,
+                                error: exports.ERROR_CODEs.InvalidRequest,
+                                id: res.id
+                            }];
                 }
             });
         });
+    };
+    JsonRpc2.prototype.handleResponse = function (res) {
+        var id = res.id, result = res.result, error = res.error;
+        var _a = this.waitForResult.get(id), successCall = _a.successCall, failCall = _a.failCall;
+        this.waitForResult["delete"](id);
+        return result ? successCall(result) : failCall(error);
     };
     JsonRpc2.prototype.timeoutHandle = function () {
         var _this = this;
@@ -162,16 +204,12 @@ var JsonRpc2 = (function () {
                         jsonrpc: _this.version,
                         error: exports.ERROR_CODEs.Timeout,
                         id: key
-                    })["catch"](function () { });
+                    });
                 }
             });
         }, this.timeout);
     };
-    JsonRpc2.prototype.call = function (method) {
-        var params = [];
-        for (var _i = 1; _i < arguments.length; _i++) {
-            params[_i - 1] = arguments[_i];
-        }
+    JsonRpc2.prototype.call = function (method, params) {
         return __awaiter(this, void 0, void 0, function () {
             var id, content, result;
             var _this = this;
@@ -206,10 +244,10 @@ var JsonRpc2 = (function () {
             var _this = this;
             return __generator(this, function (_a) {
                 results = args.map(function (_a) {
-                    var method = _a[0], params = _a.slice(1);
-                    return _this.call.apply(_this, __spreadArrays([method], params));
+                    var method = _a.method, params = _a.params;
+                    return _this.call(method, params);
                 });
-                return [2, Promise.all(results)];
+                return [2, Promise.allSettled(results)];
             });
         });
     };
